@@ -11,17 +11,19 @@ const updateVideosBtn = document.getElementById('updateVideosBtn');
 
 let folders = {};
 let activeFolder = null;
+let channelNames = {};
 
 const API_KEY = 'YOUR_API_KEY';
 updateVideosBtn.onclick = fetchVideos;
 
 function saveFolders() {
-    chrome.storage.local.set({ folders });
+    chrome.storage.local.set({ folders, channelNames });
 }
 
 function loadFolders() {
-    chrome.storage.local.get('folders', (data) => {
+    chrome.storage.local.get(['folders', 'channelNames'], (data) => {
         folders = data.folders || {};
+        channelNames = data.channelNames || {};
         renderFolders();
     });
 }
@@ -44,58 +46,61 @@ function openFolder(folderName) {
     fetchVideos();
 }
 
-function renderChannels() {
+async function fetchChannelName(channelId) {
+    if (channelNames[channelId]) return channelNames[channelId];
+
+    try {
+        const response = await fetch(
+            `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${API_KEY}`
+        );
+        const data = await response.json();
+        if (data.items[0]?.snippet?.title) {
+            channelNames[channelId] = data.items[0].snippet.title;
+            saveFolders();
+            return channelNames[channelId];
+        }
+    } catch (error) {
+        console.error('Error fetching channel name:', error);
+    }
+    return channelId;
+}
+
+async function renderChannels() {
     channelList.innerHTML = '';
     const channels = folders[activeFolder] || [];
-    channels.forEach((channel, index) => {
+
+    for (let i = 0; i < channels.length; i++) {
+        const channelId = channels[i];
         const channelItem = document.createElement('li');
-        channelItem.textContent = channel;
+
+        channelItem.textContent = 'Loading...';
+
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = 'Remove';
         deleteBtn.onclick = () => {
-            channels.splice(index, 1);
+            channels.splice(i, 1);
             saveFolders();
             renderChannels();
         };
+
+        channelItem.textContent = await fetchChannelName(channelId);
         channelItem.appendChild(deleteBtn);
         channelList.appendChild(channelItem);
-    });
+    }
 }
 
 function fetchVideos() {
-    videoList.innerHTML = '<li>Loading...</li>'; // Indicate loading state
+    videoList.innerHTML = '<li>Loading...</li>';
     const channels = folders[activeFolder] || [];
 
-    const promises = channels.map((channelUrl) => {
-        // Extract username or channel ID
-        const isUsername = channelUrl.includes('/@');
-        const identifier = isUsername
-            ? channelUrl.split('/@')[1] // Extract username
-            : channelUrl.split('/').pop(); // Extract channel ID
-
-        // Resolve to channel ID if necessary
-        const url = isUsername
-            ? `https://www.googleapis.com/youtube/v3/channels?part=id&forUsername=${identifier}&key=${API_KEY}`
-            : `https://www.googleapis.com/youtube/v3/channels?part=id&id=${identifier}&key=${API_KEY}`;
-
-        return fetch(url)
-            .then((response) => response.json())
-            .then((data) => {
-                const channelId = isUsername
-                    ? data.items[0]?.id // Resolve from username to channel ID
-                    : identifier; // Use provided channel ID
-
-                if (!channelId) throw new Error(`Invalid channel: ${channelUrl}`);
-
-                // Fetch recent videos for the resolved channel ID
-                const videosUrl = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${channelId}&part=snippet&order=date&maxResults=5`;
-                return fetch(videosUrl).then((response) => response.json());
-            });
+    const promises = channels.map((channelId) => {
+        const videosUrl = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${channelId}&part=snippet&order=date&maxResults=5`;
+        return fetch(videosUrl).then((response) => response.json());
     });
 
     Promise.all(promises)
         .then((results) => {
-            videoList.innerHTML = ''; // Clear loading state
+            videoList.innerHTML = '';
             let allVideos = [];
 
             results.forEach((result) => {
@@ -105,20 +110,20 @@ function fetchVideos() {
                             allVideos.push({
                                 title: video.snippet.title,
                                 videoId: video.id.videoId,
-                                publishDate: video.snippet.publishedAt
+                                publishDate: video.snippet.publishedAt,
+                                channelTitle: video.snippet.channelTitle
                             });
                         }
                     });
                 }
             });
 
-            // Sort all videos by publish date (newest first)
             allVideos.sort((a, b) => new Date(b.publishDate) - new Date(a.publishDate));
 
             if (allVideos.length > 0) {
                 allVideos.forEach((video) => {
                     const videoItem = document.createElement('li');
-                    videoItem.textContent = `${video.title} (${new Date(video.publishDate).toLocaleString()})`;
+                    videoItem.textContent = `${video.channelTitle}: ${video.title} (${new Date(video.publishDate).toLocaleString()})`;
                     videoItem.onclick = () => {
                         window.open(`https://www.youtube.com/watch?v=${video.videoId}`, '_blank');
                     };
@@ -134,7 +139,6 @@ function fetchVideos() {
         });
 }
 
-
 createFolderBtn.onclick = () => {
     const folderName = prompt('Enter folder name:');
     if (folderName) {
@@ -147,7 +151,8 @@ createFolderBtn.onclick = () => {
 addChannelBtn.onclick = () => {
     const channelUrl = prompt('Enter YouTube channel ID:');
     if (channelUrl) {
-        folders[activeFolder].push(channelUrl);
+        const channelId = channelUrl.split('/').pop();
+        folders[activeFolder].push(channelId);
         saveFolders();
         renderChannels();
     }
