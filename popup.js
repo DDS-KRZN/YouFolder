@@ -96,23 +96,35 @@ function fetchVideos() {
     Promise.all(promises)
         .then((results) => {
             videoList.innerHTML = ''; // Clear loading state
-            let hasVideos = false;
+            let allVideos = [];
 
             results.forEach((result) => {
                 if (result.items) {
-                    hasVideos = true;
                     result.items.forEach((video) => {
-                        const videoItem = document.createElement('li');
-                        videoItem.textContent = video.snippet.title;
-                        videoItem.onclick = () => {
-                            window.open(`https://www.youtube.com/watch?v=${video.id.videoId}`, '_blank');
-                        };
-                        videoList.appendChild(videoItem);
+                        if (video.id.videoId) {
+                            allVideos.push({
+                                title: video.snippet.title,
+                                videoId: video.id.videoId,
+                                publishDate: video.snippet.publishedAt
+                            });
+                        }
                     });
                 }
             });
 
-            if (!hasVideos) {
+            // Sort all videos by publish date (newest first)
+            allVideos.sort((a, b) => new Date(b.publishDate) - new Date(a.publishDate));
+
+            if (allVideos.length > 0) {
+                allVideos.forEach((video) => {
+                    const videoItem = document.createElement('li');
+                    videoItem.textContent = `${video.title} (${new Date(video.publishDate).toLocaleString()})`;
+                    videoItem.onclick = () => {
+                        window.open(`https://www.youtube.com/watch?v=${video.videoId}`, '_blank');
+                    };
+                    videoList.appendChild(videoItem);
+                });
+            } else {
                 videoList.innerHTML = '<li>No videos found.</li>';
             }
         })
@@ -133,7 +145,7 @@ createFolderBtn.onclick = () => {
 };
 
 addChannelBtn.onclick = () => {
-    const channelUrl = prompt('Enter YouTube channel URL:');
+    const channelUrl = prompt('Enter YouTube channel ID:');
     if (channelUrl) {
         folders[activeFolder].push(channelUrl);
         saveFolders();

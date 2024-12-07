@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouFolder",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Organize YouTube channels into folders and view their latest videos.",
   "permissions": ["storage", "activeTab"],
   "host_permissions": ["https://www.googleapis.com/*"],
