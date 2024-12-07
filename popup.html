@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouFolder</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div id="app">
+  <h1>YouFolder</h1>
+  <button id="createFolderBtn">+ Create Folder</button>
+  <ul id="folderList"></ul>
+  <div id="folderContent" style="display: none;">
+    <button id="updateVideosBtn">Update Videos</button>
+    <h2 id="folderTitle"></h2>
+    <button id="addChannelBtn">+ Add Channel</button>
+    <button id="renameFolderBtn">Rename Folder</button>
+    <button id="deleteFolderBtn">Delete Folder</button>
+    <ul id="channelList"></ul>
+    <h3>Recent Videos</h3>
+    <ul id="videoList"></ul>
+  </div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>
